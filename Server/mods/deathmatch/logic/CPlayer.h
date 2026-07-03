@@ -215,6 +215,10 @@ public:
     const std::string& GetSerial(uint uiIndex = 0) { return m_strSerials[uiIndex % NUMELMS(m_strSerials)]; }
     void               SetSerial(const std::string& strSerial, uint uiIndex) { m_strSerials[uiIndex % NUMELMS(m_strSerials)] = strSerial; }
 
+    // Client-computed hardware-based SGS serial (independent of the regular serial, may be empty).
+    const std::string& GetSgsSerial() { return m_strSgsSerial; }
+    void               SetSgsSerial(const std::string& strSgsSerial) { m_strSgsSerial = strSgsSerial; }
+
     unsigned char GetBlurLevel() { return m_ucBlurLevel; }
     void          SetBlurLevel(unsigned char ucBlurLevel) { m_ucBlurLevel = ucBlurLevel; }
 
@@ -415,6 +419,7 @@ private:
     bool          m_bNametagShowing;
 
     std::string m_strSerials[2];
+    std::string m_strSgsSerial;
 
     unsigned char m_ucBlurLevel;
 

@@ -41,6 +41,9 @@ public:
 
     bool IsOptionalUpdateInfoRequired() { return m_bOptionalUpdateInfoRequired; }
 
+    // Client-computed hardware-based SGS serial (empty for older clients that do not send one).
+    const SString& GetSgsSerial() const { return m_strSgsSerial; }
+
 private:
     unsigned short m_usNetVersion;
     unsigned short m_usMTAVersion;
@@ -50,4 +53,5 @@ private:
     SString        m_strNick;
     MD5            m_Password;
     CMtaVersion    m_strPlayerVersion;
+    SString        m_strSgsSerial;
 };

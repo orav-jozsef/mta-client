@@ -32,6 +32,17 @@ bool CPlayerJoinDataPacket::Read(NetBitStreamInterface& BitStream)
     {
         // Shrink string sizes to fit
         m_strNick = *m_strNick;
+
+        // Read the client-computed SGS serial from the reserved trailing field (previously unused
+        // community data). Older clients zero-fill this field, which we treat as "no SGS serial".
+        // A read failure (an even older client that omits the field) is non-fatal: we leave the
+        // SGS serial empty so the player can still join. Content is validated later, server-side.
+        char szSgsSerial[MAX_SERIAL_LENGTH + 1] = {0};
+        if (BitStream.Read(szSgsSerial, MAX_SERIAL_LENGTH))
+        {
+            szSgsSerial[MAX_SERIAL_LENGTH] = '\0';
+            m_strSgsSerial = szSgsSerial;
+        }
         return true;
     }
 

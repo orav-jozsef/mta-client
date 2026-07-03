@@ -38,6 +38,9 @@
 #include <game/CProjectileInfo.h>
 #include <game/CVehicleAudioSettingsManager.h>
 #include <windowsx.h>
+#ifdef WIN32
+    #include <intrin.h>            // __cpuid, used by GenerateSgsSerial
+#endif
 #include "CServerInfo.h"
 #include "CClientPed.h"
 
@@ -652,6 +655,70 @@ void CClientGame::StartPlayback()
     }
 }
 
+// Generates a deterministic, hardware-based "SGS" serial for this machine.
+//
+// This value is computed independently from the regular MTA serial (which is produced by the
+// closed-source network module). We gather our own stable hardware identifiers here in the open
+// client core and hash them with our own scheme. It never uses the stored MTA serial as input, so
+// it does not derive from it in any way. The goal is a value that stays the same for a given
+// machine across sessions, restarts and MTA reinstalls, so the server can use it as a stable
+// machine identity.
+//
+// Hardware inputs, hashed in this fixed order (each labelled so its slot stays positionally stable):
+//   1. "MG:"  Windows MachineGuid (HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid);
+//             stable across reboots; regenerated only on a fresh Windows install.
+//   2. "CPU:" CPU vendor string and signature/feature words (CPUID leaf 0 and 1);
+//             stable unless the CPU changes.
+//   3. "VOL:" system-drive volume serial number;
+//             stable unless the system drive is reformatted or replaced.
+// Any input that cannot be read is left empty (deterministic fallback: we never abort, so within a
+// single machine the remaining inputs still yield a stable result). Trade-off: a Windows reinstall,
+// a system-drive reformat/replacement or a CPU swap changes the value; ordinary use does not. This
+// is as close to "same hardware -> same serial" as user-space fingerprinting allows.
+//
+// The result is 32 uppercase hex chars (the first half of a SHA-256), matching the MTA serial
+// format (^[A-F0-9]{32}$) so it fits the same validation and storage as a normal serial. If not a
+// single input could be read, an empty string is returned so the server treats it as "no SGS
+// serial" rather than a constant value shared across machines.
+static SString GenerateSgsSerial()
+{
+    SString strMachineGuid;
+    SString strCpu;
+    SString strVolume;
+
+#ifdef WIN32
+    // 1. MachineGuid from the registry.
+    strMachineGuid = GetSystemRegistryValue((uint)HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Cryptography", "MachineGuid");
+
+    // 2. CPU identification via CPUID (leaf 0 = vendor string, leaf 1 = signature/features).
+    int cpuInfo[4] = {0};
+    __cpuid(cpuInfo, 0);
+    strCpu += SString("%08x%08x%08x%08x", cpuInfo[0], cpuInfo[1], cpuInfo[2], cpuInfo[3]);
+    __cpuid(cpuInfo, 1);
+    strCpu += SString("%08x%08x%08x%08x", cpuInfo[0], cpuInfo[1], cpuInfo[2], cpuInfo[3]);
+
+    // 3. System-drive volume serial number.
+    char szWinDir[MAX_PATH] = {0};
+    if (GetWindowsDirectoryA(szWinDir, sizeof(szWinDir)) >= 3 && szWinDir[1] == ':')
+    {
+        char  szRoot[4] = {szWinDir[0], ':', '\\', '\0'};
+        DWORD dwVolumeSerial = 0;
+        if (GetVolumeInformationA(szRoot, nullptr, 0, &dwVolumeSerial, nullptr, nullptr, nullptr, 0))
+            strVolume = SString("%08x", dwVolumeSerial);
+    }
+#endif
+
+    // If not a single hardware input could be read, report "no SGS serial" instead of hashing a
+    // constant, which would otherwise collide across every machine in that state.
+    if (strMachineGuid.empty() && strCpu.empty() && strVolume.empty())
+        return "";
+
+    // Own hashing method, independent of how the regular serial is derived. Labelled, fixed-order
+    // concatenation keeps each input in a stable position even when one of them is empty.
+    SString strHardware = SString("MG:%s|CPU:%s|VOL:%s", strMachineGuid.c_str(), strCpu.c_str(), strVolume.c_str());
+    return GenerateSha256HexString(strHardware).substr(0, MAX_SERIAL_LENGTH);
+}
+
 bool CClientGame::StartGame(const char* szNick, const char* szPassword, eServerType Type)
 {
     m_ServerType = Type;
@@ -720,9 +787,14 @@ bool CClientGame::StartGame(const char* szNick, const char* szPassword, eServerT
             pBitStream->Write(strTemp.c_str(), MAX_PLAYER_NICK_LENGTH);
             pBitStream->Write(reinterpret_cast<const char*>(Password.data), sizeof(MD5));
 
-            // Append community information (removed, but we keep this to retain protocol compat)
-            std::string strUser;
-            pBitStream->Write(strUser.c_str(), MAX_SERIAL_LENGTH);
+            // Append the client-computed SGS serial in the reserved trailing field that previously
+            // carried (now removed) community information. The field keeps its fixed MAX_SERIAL_LENGTH
+            // size so the wire format is unchanged: older servers simply ignore it, and older clients
+            // send it empty. The buffer is zero-filled, so a shorter/empty serial is padded with nulls.
+            char szSgsSerial[MAX_SERIAL_LENGTH] = {0};
+            SString strSgsSerial = GenerateSgsSerial();
+            memcpy(szSgsSerial, strSgsSerial.c_str(), std::min<size_t>(strSgsSerial.length(), MAX_SERIAL_LENGTH));
+            pBitStream->Write(szSgsSerial, MAX_SERIAL_LENGTH);
 
             // Send the packet as joindata
             g_pNet->SendPacket(PACKET_ID_PLAYER_JOINDATA, pBitStream, PACKET_PRIORITY_HIGH, PACKET_RELIABILITY_RELIABLE_ORDERED);

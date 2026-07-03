@@ -1937,6 +1937,16 @@ void CGame::Packet_PlayerJoinData(CPlayerJoinDataPacket& Packet)
                             pPlayer->SetSerial(strExtra, 1);
                             pPlayer->SetPlayerVersion(strPlayerVersion);
 
+                            // Store the client-computed hardware-based SGS serial. Validate it as
+                            // 32 uppercase hex; anything else (including the empty field sent by
+                            // older clients) is stored as empty so scripts get a clean "" rather
+                            // than malformed data. A missing/invalid SGS serial never blocks the join.
+                            const SString& strSgsSerial = Packet.GetSgsSerial();
+                            if (std::regex_match(static_cast<const std::string&>(strSgsSerial), serialRegex))
+                                pPlayer->SetSgsSerial(strSgsSerial);
+                            else
+                                pPlayer->SetSgsSerial("");
+
                             // Check if client must update
                             if (IsBelowMinimumClient(pPlayer->GetPlayerVersion()) && !pPlayer->ShouldIgnoreMinClientVersionChecks())
                             {

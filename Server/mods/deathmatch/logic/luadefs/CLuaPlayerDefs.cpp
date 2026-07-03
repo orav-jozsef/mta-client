@@ -718,8 +718,15 @@ int CLuaPlayerDefs::GetPlayerSerial(lua_State* luaVM)
         SString strSerial = CStaticFunctionDefinitions::GetPlayerSerial(pPlayer, uiIndex);
         if (!strSerial.empty())
         {
+            // First return value: the original serial, unchanged for backward compatibility.
+            // Existing scripts doing `local s = getPlayerSerial(player)` keep the same behaviour.
             lua_pushstring(luaVM, strSerial);
-            return 1;
+            // Second return value: the client-computed, hardware-based "SGS" serial. New scripts
+            // read it with `serial, sgsSerial = getPlayerSerial(player)`; old scripts ignore it.
+            // Empty string for older clients that do not send an SGS serial.
+            SString strSgsSerial = CStaticFunctionDefinitions::GetPlayerSgsSerial(pPlayer, uiIndex);
+            lua_pushstring(luaVM, strSgsSerial);
+            return 2;
         }
     }
     else

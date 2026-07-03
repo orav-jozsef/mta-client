@@ -3171,6 +3171,17 @@ const std::string& CStaticFunctionDefinitions::GetPlayerSerial(CPlayer* pPlayer,
     return pPlayer->GetSerial(uiIndex);
 }
 
+std::string CStaticFunctionDefinitions::GetPlayerSgsSerial(CPlayer* pPlayer, uint /*uiIndex*/)
+{
+    assert(pPlayer);
+
+    // The SGS serial is computed independently on the client from its own hardware fingerprint
+    // and transmitted at join time; the server only stores and returns it. It is a single value
+    // (unlike the regular serial, which is indexed), so uiIndex is unused. Empty when the client
+    // did not provide a valid one (e.g. an older client).
+    return pPlayer->GetSgsSerial();
+}
+
 std::string CStaticFunctionDefinitions::GetPlayerUserName(CPlayer* pPlayer)
 {
     return "";

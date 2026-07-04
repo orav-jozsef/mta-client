@@ -77,6 +77,7 @@
 #include "lua/CLuaFunctionParseHelpers.h"
 #include "CZipMaker.h"
 #include "version.h"
+#include "SharedSgsVersion.h"
 #include "net/SimHeaders.h"
 #include <signal.h>
 #include <regex>
@@ -1936,6 +1937,19 @@ void CGame::Packet_PlayerJoinData(CPlayerJoinDataPacket& Packet)
                             pPlayer->SetSerial(strSerial, 0);
                             pPlayer->SetSerial(strExtra, 1);
                             pPlayer->SetPlayerVersion(strPlayerVersion);
+
+                            // SGS ecosystem version gate (separate from the MTA version). The client
+                            // sends its SGS version in the join-data packet; reject any client whose
+                            // SGS version is missing (e.g. a vanilla client) or whose major version
+                            // differs from ours. This is server-authoritative and cannot be bypassed
+                            // by a patched client.
+                            if (!IsSgsVersionCompatible(Packet.GetSgsVersion().c_str()))
+                            {
+                                CLogger::LogPrintf("CONNECT: %s failed to connect (SGS version mismatch: '%s') (%s)\n", szNick,
+                                                   Packet.GetSgsVersion().c_str(), strIPAndSerial.c_str());
+                                DisconnectPlayer(this, *pPlayer, CPlayerDisconnectedPacket::SGS_VERSION_MISMATCH);
+                                return;
+                            }
 
                             // Check if client must update
                             if (IsBelowMinimumClient(pPlayer->GetPlayerVersion()) && !pPlayer->ShouldIgnoreMinClientVersionChecks())

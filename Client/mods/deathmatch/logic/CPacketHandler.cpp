@@ -608,6 +608,10 @@ void CPacketHandler::Packet_ServerDisconnected(NetBitStreamInterface& bitStream)
             strReason = _("Disconnected: Server shutdown or restarting");
             strErrorCode = _E("CD49");
             break;
+        case ePlayerDisconnectType::SGS_VERSION_MISMATCH:
+            strReason = _("Disconnected: incompatible or missing SGS client version");
+            strErrorCode = _E("CD51");
+            break;
         default:
             break;
     }

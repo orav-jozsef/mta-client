@@ -634,6 +634,9 @@ bool CServerListItem::ParseQuery()
     if (bMasterServerOffline || (uiMasterServerSaysRestrictions & RESTRICTION_SERVER_VERSION) == false)
         strVersion = info.versionText;
 
+    // SGS ecosystem version is not gated by master-server restrictions; it is our own field.
+    strSgsVersion = info.sgsVersion;
+
     if (bMasterServerOffline || (uiMasterServerSaysRestrictions & RESTRICTION_PASSWORDED_FLAG) == false)
         bPassworded = info.isPassworded;
 

@@ -202,6 +202,11 @@ SQueryInfo CQueryReceiver::GetServerResponse()
                 info.httpPort = static_cast<ushort>(httpPort);
         }
 
+        // Recover the SGS ecosystem version if present (appended after the http port by SGS
+        // servers). Empty for vanilla/older servers, which the SGS client treats as "not an SGS
+        // server". This stays inside the map-name blob, so it is not read as a player nick below.
+        info.sgsVersion = strHttpPort.Right(strHttpPort.length() - strlen(strHttpPort) - 1);
+
         // Get player nicks
         while (i < len)
         {

@@ -45,6 +45,7 @@ struct SQueryInfo
     SString upTime;
     ushort  httpPort;
     ushort  pingTime;
+    SString sgsVersion;            // SGS ecosystem version advertised by the server (empty if none)
 
     std::vector<SString> playersPool;
 };

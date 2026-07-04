@@ -10,6 +10,7 @@
  *****************************************************************************/
 
 #include "StdInc.h"
+#include <SharedSgsVersion.h>
 #include <net/SyncStructures.h>
 #include <game/C3DMarkers.h>
 #include <game/CAnimBlendAssocGroup.h>
@@ -720,9 +721,15 @@ bool CClientGame::StartGame(const char* szNick, const char* szPassword, eServerT
             pBitStream->Write(strTemp.c_str(), MAX_PLAYER_NICK_LENGTH);
             pBitStream->Write(reinterpret_cast<const char*>(Password.data), sizeof(MD5));
 
-            // Append community information (removed, but we keep this to retain protocol compat)
+            // Canonical trailing-field order (MUST stay identical to the server read side in
+            // CPlayerJoinDataPacket::Read):
+            //   1. reserved MAX_SERIAL_LENGTH field (legacy community slot / SGS serial on the
+            //      sgs-serial branch) - written here as before.
+            //   2. SGS ecosystem version, length-prefixed (this feature). The server rejects the
+            //      join if this is missing or its major version is incompatible.
             std::string strUser;
             pBitStream->Write(strUser.c_str(), MAX_SERIAL_LENGTH);
+            pBitStream->WriteString(SString(SGS_VERSION_STRING));
 
             // Send the packet as joindata
             g_pNet->SendPacket(PACKET_ID_PLAYER_JOINDATA, pBitStream, PACKET_PRIORITY_HIGH, PACKET_RELIABILITY_RELIABLE_ORDERED);

@@ -11,6 +11,7 @@
 
 #include "StdInc.h"
 #include "net/Packets.h"
+#include "SharedSgsVersion.h"
 using namespace std;
 
 static CConnectManager* g_pConnectManager = NULL;
@@ -251,6 +252,19 @@ void CConnectManager::DoPulse()
                     GetVersionUpdater()->InitiateSidegradeLaunch(m_pServerItem->strVersion, m_strHost.c_str(), m_usPort, m_strNick.c_str(),
                                                                  m_strPassword.c_str());
                     Abort();
+                    return;
+                }
+
+                // SGS ecosystem check: refuse to connect to a server that is not an SGS server or
+                // advertises an incompatible SGS version. Only enforced when the server was actually
+                // scanned (bScanned); a skipped/failed query (bSkipped) must NOT block a good server,
+                // since the server-side gate still enforces SGS on join.
+                if (m_pServerItem->bScanned && !IsSgsVersionCompatible(m_pServerItem->strSgsVersion.c_str()))
+                {
+                    Abort();
+                    CCore::GetSingleton().ShowMessageBox(_("Error") + _E("CC51"),
+                                                         _("This server is not an SGS server, or runs an incompatible SGS version."),
+                                                         MB_BUTTON_OK | MB_ICON_ERROR);
                     return;
                 }
             }

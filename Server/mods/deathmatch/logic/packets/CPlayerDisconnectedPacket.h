@@ -40,7 +40,8 @@ public:
         KICK,
         CUSTOM,
         SHUTDOWN,
-        SERIAL_DUPLICATE
+        SERIAL_DUPLICATE,
+        SGS_VERSION_MISMATCH            // Client SGS version missing or incompatible (serialized in 5 bits, keep < 32)
     };
 
     CPlayerDisconnectedPacket(const char* szReason);

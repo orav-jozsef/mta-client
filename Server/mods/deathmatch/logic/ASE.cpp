@@ -12,6 +12,7 @@
 #include "StdInc.h"
 #include "ASE.h"
 #include "version.h"
+#include "SharedSgsVersion.h"
 #include "CLanBroadcast.h"
 #include "CPlayerManager.h"
 #include "CMainConfig.h"
@@ -436,9 +437,13 @@ std::string ASE::QueryLight()
     SString strNetRoute = (const char*)strNetRouteFixed;
     SString strUpTime("%d", (uint)(time(NULL) - m_tStartTime));
     SString strHttpPort("%d", m_pMainConfig->GetHTTPPort());
+    // SGS ecosystem version, appended as one more null-separated segment of the map-name blob
+    // (the established backwardly-compatible extension point). Older/vanilla clients simply stop
+    // extracting before this segment and ignore it; SGS clients read it for the pre-connect check.
+    SString strSgsVersion(SGS_VERSION_STRING);
 
     uint uiExtraDataLength = (strPlayerCount.length() + 1 + strBuildType.length() + 1 + strBuildNumber.length() + 1 + strPingStatus.length() + 1 +
-                              strNetRoute.length() + 1 + strUpTime.length() + 1 + strHttpPort.length() + 1);
+                              strNetRoute.length() + 1 + strUpTime.length() + 1 + strHttpPort.length() + 1 + strSgsVersion.length() + 1);
     uint uiMaxMapNameLength = 250 - uiExtraDataLength;
     m_strMapName = m_strMapName.Left(uiMaxMapNameLength);
 
@@ -472,6 +477,8 @@ std::string ASE::QueryLight()
     reply << strUpTime;
     reply << (unsigned char)0;
     reply << strHttpPort;
+    reply << (unsigned char)0;
+    reply << strSgsVersion;
     // version
     std::string temp = MTA_DM_ASE_VERSION;
     reply << (unsigned char)(temp.length() + 1);

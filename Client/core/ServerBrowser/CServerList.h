@@ -201,6 +201,7 @@ public:
 
     SString strGameName;        // Game name. Always 'mta'
     SString strVersion;         // Game version
+    SString strSgsVersion;      // SGS ecosystem version advertised by the server (empty if none)
     SString strName;            // Server name
     SString strSearchableName;  // Server name to use for searches
     SString strHost;            // Server host as IP

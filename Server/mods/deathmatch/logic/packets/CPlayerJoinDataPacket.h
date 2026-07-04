@@ -41,6 +41,9 @@ public:
 
     bool IsOptionalUpdateInfoRequired() { return m_bOptionalUpdateInfoRequired; }
 
+    // Client-advertised SGS ecosystem version (empty if the client did not send one).
+    const SString& GetSgsVersion() const { return m_strSgsVersion; }
+
 private:
     unsigned short m_usNetVersion;
     unsigned short m_usMTAVersion;
@@ -50,4 +53,5 @@ private:
     SString        m_strNick;
     MD5            m_Password;
     CMtaVersion    m_strPlayerVersion;
+    SString        m_strSgsVersion;
 };

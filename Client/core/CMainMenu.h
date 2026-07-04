@@ -22,6 +22,7 @@ class CMainMenu;
 #include <Graphics/CGraphics.h>
 class CNewsBrowser;
 class CLanguageSelector;
+class CGUIButton;
 
 #define CORE_MTA_NEWS_ITEMS 3
 
@@ -94,6 +95,10 @@ private:
     bool OnHostGameButtonClick();
     bool OnDisconnectButtonClick();
     bool OnEditorButtonClick();
+
+    // Locked client: build the whitelisted server buttons and handle their clicks.
+    void CreateServerButtons();
+    bool OnServerButtonClick(CGUIElement* pElement);
     bool OnSettingsButtonClick(CGUIElement* pElement);
     bool OnAboutButtonClick(CGUIElement* pElement);
     bool OnQuitButtonClick(CGUIElement* pElement);
@@ -115,6 +120,7 @@ private:
     CGUIScrollPane* m_pCanvas;
 
     std::deque<sMenuItem*> m_menuItems;
+    std::vector<CGUIButton*> m_serverButtons;            // Locked client: one Connect button per whitelisted (menu) server
     std::set<sMenuItem*>   m_unhoveredItems;
     sMenuItem*             m_pDisconnect;
     sMenuItem*             m_pHoveredItem;

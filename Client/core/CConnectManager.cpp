@@ -11,6 +11,7 @@
 
 #include "StdInc.h"
 #include "net/Packets.h"
+#include "CServerWhitelist.h"
 using namespace std;
 
 static CConnectManager* g_pConnectManager = NULL;
@@ -115,6 +116,16 @@ bool CConnectManager::Connect(const char* szHost, unsigned short usPort, const c
     {
         SString strBuffer = _("Connecting failed. Invalid host provided!");
         CCore::GetSingleton().ShowMessageBox(_("Error") + _E("CC21"), strBuffer, MB_BUTTON_OK | MB_ICON_ERROR);  // Invalid host provided
+        return false;
+    }
+
+    // Enforce the compiled-in server whitelist. This is the single choke point for all remote
+    // connects (menu buttons, the "connect" command, mtasa:// URIs and internal retries all pass
+    // through here), so a host that is not in the allowed list can never be reached.
+    if (!CServerWhitelist::IsAllowed(m_strHost, m_Address, m_usPort))
+    {
+        SString strBuffer(_("Connecting to %s:%u is not allowed on this client."), m_strHost.c_str(), m_usPort);
+        CCore::GetSingleton().ShowMessageBox(_("Error") + _E("CC21"), strBuffer, MB_BUTTON_OK | MB_ICON_ERROR);
         return false;
     }
 

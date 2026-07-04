@@ -14,6 +14,8 @@
 #include "CNewsBrowser.h"
 #include "CLanguageSelector.h"
 #include "CDiscordRichPresence.h"
+#include "CServerWhitelist.h"
+#include <gui/CGUIButton.h>
 
 #define NATIVE_RES_X 1280.0f
 #define NATIVE_RES_Y 1024.0f
@@ -179,20 +181,18 @@ CMainMenu::CMainMenu(CGUI* pManager)
     // Create the menu items
     // Filepath, Relative position, absolute native size
     // And the font for the graphics is ?
+    //
+    // Locked client: Quick Connect, Browse Servers, Host Game and Map Editor are intentionally
+    // omitted. Players may only join the servers in the compiled-in whitelist, which are added
+    // as buttons by CreateServerButtons() (see CServerWhitelist). Only Settings, About and Quit
+    // remain as standard image items.
     int iMenuItemIndex = 0;
-    m_menuItems.push_back(CreateItem(MENU_ITEM_QUICK_CONNECT, "menu_quick_connect.png", CVector2D(0.168f, fBase + fGap * iMenuItemIndex++)));
-    m_menuItems.push_back(CreateItem(MENU_ITEM_BROWSE_SERVERS, "menu_browse_servers.png", CVector2D(0.168f, fBase + fGap * iMenuItemIndex++)));
-
-    // Only add Host Game and Map Editor if server folder exists
-    if (DirectoryExists(CalcMTASAPath("server")))
-    {
-        m_menuItems.push_back(CreateItem(MENU_ITEM_HOST_GAME, "menu_host_game.png", CVector2D(0.168f, fBase + fGap * iMenuItemIndex++)));
-        m_menuItems.push_back(CreateItem(MENU_ITEM_MAP_EDITOR, "menu_map_editor.png", CVector2D(0.168f, fBase + fGap * iMenuItemIndex++)));
-    }
-
     m_menuItems.push_back(CreateItem(MENU_ITEM_SETTINGS, "menu_settings.png", CVector2D(0.168f, fBase + fGap * iMenuItemIndex++)));
     m_menuItems.push_back(CreateItem(MENU_ITEM_ABOUT, "menu_about.png", CVector2D(0.168f, fBase + fGap * iMenuItemIndex++)));
     m_menuItems.push_back(CreateItem(MENU_ITEM_QUIT, "menu_quit.png", CVector2D(0.168f, fBase + fGap * iMenuItemIndex++)));
+
+    // Locked client: add a Connect button for each whitelisted (production) server.
+    CreateServerButtons();
 
     // We store the position of the top item, and the second item.  These will be useful later
     float fFirstItemSize = m_menuItems.front()->image->GetSize(false).fY;
@@ -380,6 +380,14 @@ CMainMenu::~CMainMenu()
     m_menuItems.clear();
     m_unhoveredItems.clear();
     m_pHoveredItem = nullptr;
+
+    // Locked client: destroy the whitelisted server buttons.
+    for (CGUIButton* pButton : m_serverButtons)
+    {
+        if (pButton)
+            m_pManager->DestroyElementRecursive(pButton);
+    }
+    m_serverButtons.clear();
 
     if (m_pDisconnect)
     {
@@ -724,6 +732,10 @@ void CMainMenu::Update()
 void CMainMenu::Show(bool bOverlay)
 {
     SetVisible(true, bOverlay);
+
+    // Locked client: keep the console visible as the on-screen log whenever the menu is shown.
+    if (CConsoleInterface* pConsole = CCore::GetSingleton().GetConsole())
+        pConsole->SetVisible(true);
 }
 
 void CMainMenu::Hide()
@@ -1132,6 +1144,55 @@ sMenuItem* CMainMenu::CreateItem(unsigned char menuType, const char* szFilename,
     s->nativeSizeY = vecNativeSize.fY;
     s->image = pImage;
     return s;
+}
+
+void CMainMenu::CreateServerButtons()
+{
+    // Locked client: lay the whitelisted production servers out as a vertical stack of text
+    // buttons on the menu canvas. Only entries flagged bShownInMenu are offered here; Dev and
+    // MapEditor stay reachable through the console / mtasa:// only. Each button carries a pointer
+    // to its (statically-stored) whitelist entry so the click handler knows the target.
+    const float fButtonRelX = 0.42f;            // to the right of the image menu items
+    const float fButtonRelW = 0.24f;
+    const float fButtonRelH = 0.035f;
+    const float fStartRelY = 0.613f;            // same baseline as the image items
+    const float fButtonGapY = 0.045f;
+
+    int iIndex = 0;
+    for (const CServerWhitelist::SServerEntry& entry : CServerWhitelist::Servers)
+    {
+        if (!entry.bShownInMenu)
+            continue;
+
+        CGUIButton* pButton = reinterpret_cast<CGUIButton*>(m_pManager->CreateButton(m_pCanvas, entry.szName));
+        pButton->SetPosition(CVector2D(fButtonRelX * m_iMenuSizeX, (fStartRelY + fButtonGapY * iIndex) * m_iMenuSizeY), false);
+        pButton->SetSize(CVector2D(fButtonRelW * m_iMenuSizeX, fButtonRelH * m_iMenuSizeY), false);
+        pButton->SetProperty("InheritsAlpha", "False");
+        pButton->SetUserData(const_cast<CServerWhitelist::SServerEntry*>(&entry));
+        pButton->SetClickHandler(GUI_CALLBACK(&CMainMenu::OnServerButtonClick, this));
+        m_serverButtons.push_back(pButton);
+        ++iIndex;
+    }
+}
+
+bool CMainMenu::OnServerButtonClick(CGUIElement* pElement)
+{
+    const CServerWhitelist::SServerEntry* pEntry = reinterpret_cast<const CServerWhitelist::SServerEntry*>(pElement->GetUserData());
+    if (!pEntry)
+        return true;
+
+    std::string strNick;
+    CVARS_GET("nick", strNick);
+    if (!CCore::GetSingleton().IsValidNick(strNick.c_str()))
+    {
+        CCore::GetSingleton().ShowMessageBox(_("Error") + _E("CC20"), _("Please set a valid nickname in Settings first."), MB_BUTTON_OK | MB_ICON_ERROR);
+        return true;
+    }
+
+    // Connect passes through the single whitelist choke point in CConnectManager::Connect, which
+    // re-validates the target against the same compiled-in list.
+    CCore::GetSingleton().GetConnectManager()->Connect(pEntry->szHost, pEntry->usPort, strNick.c_str(), "");
+    return true;
 }
 
 bool CMainMenu::SetItemHoverProgress(sMenuItem* pItem, float fProgress, bool bHovering)
